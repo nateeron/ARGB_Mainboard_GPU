@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 RGB LED</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent2: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1rem;
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem; }
+    h2 { font-size: 1rem; margin: 0 0 0.75rem; color: var(--muted); font-weight: 600; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted); }
+    label.check-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.25rem;
+      user-select: none;
+      width: auto;
+      max-width: 100%;
+    }
+    label.check-label input[type="checkbox"] {
+      width: 1.125rem;
+      height: 1.125rem;
+      min-width: 1.125rem;
+      min-height: 1.125rem;
+      margin: 0;
+      flex-shrink: 0;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.25rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+    }
+    button {
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.success { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .effects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+    .effects button { margin: 0; padding: 0.5rem 0; font-size: 0.9rem; }
+    .effects button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    pre {
+      background: var(--bg);
+      padding: 0.75rem;
+      overflow: auto;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      max-height: 160px;
+    }
+    .ok { color: var(--accent2); }
+    .err { color: #f87171; }
+    #msg { font-size: 0.9rem; margin: 0.5rem 0 0; }
+    .color-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; }
+    .color-row input[type="color"] { width: 56px; height: 40px; border: none; padding: 0; background: none; }
+    .color-row input[type="text"] { flex: 1; margin: 0; }
+    .palette-label { font-size: 0.75rem; color: var(--muted); margin: 0.35rem 0 0.25rem; }
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(6, 1.35rem);
+      gap: 3px;
+      width: max-content;
+      max-width: 100%;
+    }
+    .palette-swatch {
+      width: 1.35rem;
+      height: 1.35rem;
+      padding: 0;
+      border-radius: 3px;
+      border: 2px solid var(--border);
+      cursor: pointer;
+    }
+    .palette-swatch:hover { border-color: var(--accent); }
+    .palette-swatch.active { border-color: #fff; box-shadow: 0 0 0 1px var(--accent); }
+    .matrix-wrap { overflow-x: auto; margin: 0.5rem 0; }
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: 1.1rem repeat(6, 1.35rem);
+      gap: 2px;
+      width: max-content;
+    }
+    .matrix-hdr { font-size: 0.55rem; color: var(--muted); text-align: center; padding: 0; line-height: 1.1; }
+    .matrix-hdr-label {
+      margin: 0;
+      font-size: 0.55rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 4px 2px;
+      min-height: 2.25rem;
+      user-select: none;
+    }
+    .matrix-hdr-label input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      min-width: 1rem;
+      min-height: 1rem;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+    .matrix-row-lbl { font-size: 0.55rem; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+    .matrix-cell {
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 2px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 0.5rem;
+      color: rgba(255,255,255,0.8);
+      padding: 0;
+      line-height: 1.35rem;
+      text-align: center;
+    }
+    .matrix-cell:disabled { opacity: 0.35; cursor: not-allowed; }
+    .tool-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    .tool-row button { flex: 1; min-width: 100px; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+    .dialog-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.55);
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .dialog-overlay.show { display: flex; }
+    .dialog-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      max-width: 320px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    .dialog-box h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--accent2); }
+    .dialog-box p { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text); line-height: 1.45; white-space: pre-line; }
+    .dialog-box button { min-width: 6rem; }
+  </style>
+</head>
+<body>
+  <h1>ESP32 RGB LED Control</h1>
+
+  <section>
+    <label>Board IP <input id="host" type="text" value="192.168.55.61"></label>
+  </section>
+
+  <section id="stripEditor">
+    <h2>ตั้งค่าไฟ — ทีละเส้น / ทีละดวง</h2>
+    <div class="color-row">
+      <input type="color" id="pickColor" value="#ffffff">
+      <input type="text" id="hexColor" value="#ffffff" maxlength="7">
+      <span style="font-size:0.8rem;color:var(--muted)">คลิกช่อง = ทาสี</span>
+    </div>
+    <p class="palette-label">แม่แบบสี (36 สี)</p>
+    <div class="palette" id="colorPalette" role="listbox" aria-label="แม่แบบสี"></div>
+    <div class="matrix-wrap">
+      <div class="matrix-grid" id="pixelMatrix"></div>
+    </div>
+    <label class="check-label"><input type="checkbox" id="liveSync"> ส่งอัตโนมัติ (400ms)</label>
+    <label class="check-label"><input type="checkbox" id="saveWithPatternRun" checked> Save แบบวิ่งรูปทรง (6 เส้น)</label>
+    <div class="tool-row">
+      <button type="button" id="btnSave" class="primary">Save</button>
+      <button type="button" id="btnSendHold">ส่งภาพ + ค้าง</button>
+      <button type="button" id="btnRunPattern" class="success">วิ่งรูปทรง (6 เส้น)</button>
+      <button type="button" id="btnStopPattern">หยุดวิ่ง</button>
+      <button type="button" id="btnFillAll">เติมทั้งตาราง</button>
+      <button type="button" id="btnClearAll">ล้างทั้งตาราง</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Effect (1–11)</h2>
+    <div class="effects" id="effectBtns"></div>
+    <div class="row" style="margin-top:0.75rem">
+      <label>Effect <input id="effect" type="number" min="1" max="11" value="8"></label>
+      <label>Brightness <input id="brightness" type="number" min="0" max="255" value="80"></label>
+    </div>
+    <div class="row">
+      <label>Speed (ms) <input id="speed" type="number" min="10" max="2000" value="60"></label>
+      <label>Trail <input id="trail" type="number" min="1" max="15" value="4"></label>
+    </div>
+    <div class="color-row">
+      <span style="font-size:0.85rem;color:var(--muted);min-width:4.5rem">Base</span>
+      <input type="color" id="baseColor" value="#ffffff">
+      <input type="text" id="baseHex" value="#ffffff" maxlength="7">
+    </div>
+    <div class="color-row">
+      <span style="font-size:0.85rem;color:var(--muted);min-width:4.5rem">พื้นหลัง</span>
+      <input type="color" id="bgColor" value="#000000" disabled>
+      <label class="check-label" style="margin:0;white-space:nowrap"><input type="checkbox" id="bgNone" checked> none</label>
+    </div>
+    <label class="check-label"><input id="rainbow" type="checkbox"> Rainbow</label>
+    <label class="check-label"><input id="power" type="checkbox" checked> Power ON</label>
+    <div class="tool-row">
+      <button type="button" id="btnEffect">POST Effect</button>
+      <button type="button" id="btnConfig" class="primary">POST Settings</button>
+      <button type="button" id="btnStatus">GET Status</button>
+    </div>
+  </section>
+
+  <p id="msg"></p>
+  <details><summary>Response JSON</summary><pre id="out">—</pre></details>
+
+  <div class="dialog-overlay" id="saveDialog" role="dialog" aria-modal="true" aria-labelledby="saveDialogTitle">
+    <div class="dialog-box">
+      <h3 id="saveDialogTitle">บันทึกสำเร็จ</h3>
+      <p id="saveDialogMsg">บันทึกลง Flash (Preferences) แล้ว</p>
+      <button type="button" class="primary" id="saveDialogOk">ตกลง</button>
+    </div>
+  </div>
+
+  <script>
+    const NUM_STRIPS = 6;
+    const NUM_LEDS = 15;
+    const EFFECT_MAX = 11;
+    const EFFECT_PATTERN_SCROLL = 11;
+    const $ = (id) => document.getElementById(id);
+
+    const effectNames = {
+      1: "Checker", 2: "Diamond", 3: "Wave", 4: "FishBone",
+      5: "Random", 6: "Rainbow", 7: "Para-R", 8: "Para-Nat", 9: "Scroll",
+      10: "Smooth หมากฮอด",
+      11: "วิ่งรูปทรง"
+    };
+
+    let currentEffect = 8;
+    let apiBusy = false;
+    let syncTimer = null;
+    const matrixCells = Array.from({ length: NUM_STRIPS }, () => []);
+    const stripColors = Array.from({ length: NUM_STRIPS }, () => Array(NUM_LEDS).fill("#000000"));
+    const stripEnabled = Array(NUM_STRIPS).fill(true);
+    const SESSION_KEY = "rgb_custom_pattern_session";
+    const LOCAL_KEY = "rgb_custom_pattern_saved";
+
+    const PALETTE = [
+      "#000000", "#333333", "#666666", "#999999", "#cccccc", "#ffffff",
+      "#ff0000", "#ff4400", "#ff8800", "#ffcc00", "#ffff00", "#ccff00",
+      "#88ff00", "#44ff00", "#00ff00", "#00ff44", "#00ff88", "#00ffcc",
+      "#00ffff", "#00ccff", "#0088ff", "#0044ff", "#0000ff", "#4400ff",
+      "#8800ff", "#cc00ff", "#ff00ff", "#ff00cc", "#ff0088", "#ff0044",
+      "#ff6699", "#ff99cc", "#ffcccc", "#aa5500", "#00aa88", "#aa00aa"
+    ];
+
+    function baseUrl() { return "http://" + $("host").value.trim(); }
+
+    function normHex(hex) {
+      let h = hex.trim();
+      if (!h.startsWith("#")) h = "#" + h;
+      return h.length === 7 ? h.toLowerCase() : "#ffffff";
+    }
+
+    function setPickColor(hex) {
+      const h = normHex(hex);
+      $("pickColor").value = h;
+      $("hexColor").value = h;
+      document.querySelectorAll(".palette-swatch").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.color === h);
+      });
+    }
+
+    function renderColorPalette() {
+      const box = $("colorPalette");
+      box.innerHTML = "";
+      PALETTE.forEach((hex) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "palette-swatch";
+        btn.dataset.color = hex;
+        btn.style.background = hex;
+        btn.title = hex;
+        btn.setAttribute("aria-label", hex);
+        btn.onclick = () => setPickColor(hex);
+        box.appendChild(btn);
+      });
+      setPickColor($("pickColor").value);
+    }
+
+    function debounce(fn, ms) {
+      return (...args) => { clearTimeout(syncTimer); syncTimer = setTimeout(() => fn(...args), ms); };
+    }
+
+    async function apiCall(fn) {
+      if (apiBusy) return null;
+      apiBusy = true;
+      try { return await fn(); } finally { apiBusy = false; }
+    }
+
+    function showResult(ok, data) {
+      $("msg").textContent = ok ? "OK" : "Error";
+      $("msg").className = ok ? "ok" : "err";
+      $("out").textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      const mode = data?.effectMode ?? data?.effect;
+      if (ok && mode !== undefined && mode >= 1) {
+        currentEffect = mode;
+        updateEffectButtons();
+      }
+    }
+
+    function showSaveDialog(data) {
+      const runPattern = !!data?.patternRun;
+      const fx = data?.effectMode ?? "";
+      let detail = "บันทึกลง Flash (Preferences) บอร์ด + เบราว์เซอร์แล้ว";
+      if (runPattern) {
+        detail += "\nโหมด: วิ่งรูปทรง (Effect 11)";
+      } else if (fx) {
+        detail += "\nโหมด: Effect " + fx;
+      }
+      detail += "\nรีบูตบอร์ดแล้วภาพยังอยู่";
+      $("saveDialogMsg").textContent = detail;
+      $("saveDialog").classList.add("show");
+    }
+
+    function hideSaveDialog() {
+      $("saveDialog").classList.remove("show");
+    }
+
+    $("saveDialogOk").onclick = hideSaveDialog;
+    $("saveDialog").onclick = (e) => {
+      if (e.target === $("saveDialog")) hideSaveDialog();
+    };
+
+    function updateEffectButtons() {
+      document.querySelectorAll("#effectBtns button").forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.n) === currentEffect);
+      });
+      $("effect").value = currentEffect;
+    }
+
+    $("pickColor").oninput = () => setPickColor($("pickColor").value);
+    $("hexColor").onchange = () => setPickColor($("hexColor").value);
+    $("baseColor").oninput = () => { $("baseHex").value = $("baseColor").value; };
+    $("baseHex").onchange = () => {
+      let h = $("baseHex").value.trim();
+      if (!h.startsWith("#")) h = "#" + h;
+      $("baseHex").value = h;
+      $("baseColor").value = h;
+    };
+    $("bgNone").onchange = () => { $("bgColor").disabled = $("bgNone").checked; };
+
+    function backgroundPayload() {
+      return $("bgNone").checked ? "none" : $("bgColor").value;
+    }
+
+    function applyStatusColors(data) {
+      const base = data.baseColor || (data.colors && data.colors[0]) || "#ffffff";
+      $("baseColor").value = base;
+      $("baseHex").value = base;
+      const bg = data.background;
+      if (bg === "none" || bg === "off" || !bg) {
+        $("bgNone").checked = true;
+        $("bgColor").disabled = true;
+      } else {
+        $("bgNone").checked = false;
+        $("bgColor").disabled = false;
+        $("bgColor").value = bg;
+      }
+    }
+
+    async function postEffect(n) {
+      const res = await fetch(baseUrl() + "/api/effect?effect=" + n, { method: "POST" });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      return JSON.parse(text);
+    }
+
+    async function postSettings(body) {
+      const res = await fetch(baseUrl() + "/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      return JSON.parse(text);
+    }
+
+    async function postPixels(strip, colors) {
+      const res = await fetch(baseUrl() + "/api/pixels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ strip, colors })
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      return JSON.parse(text);
+    }
+
+    function stripsPayload() {
+      const strips = {};
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        strips[String(s + 1)] = stripColors[s];
+      }
+      return strips;
+    }
+
+    function patternPayload() {
+      return {
+        version: 1,
+        stripColors,
+        stripEnabled,
+        saveWithPatternRun: $("saveWithPatternRun").checked,
+        savedAt: Date.now()
+      };
+    }
+
+    function applyPatternData(data) {
+      if (!data || !data.stripColors) return false;
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        if (data.stripColors[s]) {
+          for (let p = 0; p < NUM_LEDS; p++) {
+            stripColors[s][p] = data.stripColors[s][p] || "#000000";
+          }
+        }
+        if (data.stripEnabled && data.stripEnabled[s] !== undefined) {
+          stripEnabled[s] = !!data.stripEnabled[s];
+        }
+      }
+      if (data.saveWithPatternRun !== undefined) {
+        $("saveWithPatternRun").checked = !!data.saveWithPatternRun;
+      }
+      return true;
+    }
+
+    /** บันทึกถาวร — กด Save (อยู่หลังปิดเบราว์เซอร์) */
+    function savePatternPersistent() {
+      const json = JSON.stringify(patternPayload());
+      localStorage.setItem(LOCAL_KEY, json);
+      savePatternSession();
+    }
+
+    /** โหลดจาก Save ล่าสุด */
+    function loadPatternPersistent() {
+      try {
+        const raw = localStorage.getItem(LOCAL_KEY);
+        if (!raw) return false;
+        return applyPatternData(JSON.parse(raw));
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function savePatternSession() {
+      try {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(patternPayload()));
+      } catch (e) { /* quota / private mode */ }
+    }
+
+    function loadPatternSession() {
+      try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return false;
+        return applyPatternData(JSON.parse(raw));
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /** โหลดตารางสี: Flash บอร์ดก่อน → sessionStorage */
+    async function loadPatternOnStart() {
+      try {
+        const res = await fetch(baseUrl() + "/api/pattern");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasPattern && data.strips) {
+            for (let s = 0; s < NUM_STRIPS; s++) {
+              const arr = data.strips[String(s + 1)];
+              if (!arr) continue;
+              for (let p = 0; p < NUM_LEDS; p++) {
+                stripColors[s][p] = arr[p] || "#000000";
+              }
+            }
+            savePatternSession();
+            return "flash";
+          }
+        }
+      } catch (e) { /* บอร์ดไม่ตอบ — ใช้ session แทน */ }
+
+      if (loadPatternSession()) return "session";
+      return null;
+    }
+
+    async function postAllPixels(save = false, effectMode = null) {
+      const body = { strips: stripsPayload(), save };
+      if (save && effectMode !== null) body.effectMode = effectMode;
+      const res = await fetch(baseUrl() + "/api/pixels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      return JSON.parse(text);
+    }
+
+    async function postStripClear(strip) {
+      const res = await fetch(baseUrl() + "/api/strip/clear?strip=" + strip, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      return JSON.parse(await res.text());
+    }
+
+    async function postStripFill(strip, color) {
+      const res = await fetch(baseUrl() + "/api/strip/fill?strip=" + strip + "&color=" + encodeURIComponent(color), { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      return JSON.parse(await res.text());
+    }
+
+    const scheduleMatrixSync = debounce(async () => {
+      if (!$("liveSync").checked) return;
+      try { await apiCall(() => postAllPixels()); } catch (e) {}
+    }, 400);
+
+    function paintPixel(s, p, hex, cell) {
+      stripColors[s][p] = hex;
+      if (cell) {
+        cell.style.background = hex;
+        const lum = parseInt(hex.slice(1, 3), 16) * 0.299
+          + parseInt(hex.slice(3, 5), 16) * 0.587
+          + parseInt(hex.slice(5, 7), 16) * 0.114;
+        cell.style.color = lum > 120 ? "#111" : "#eee";
+      }
+      savePatternSession();
+      scheduleMatrixSync();
+    }
+
+    function updateMatrixCellStates() {
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        for (let p = 0; p < NUM_LEDS; p++) {
+          const cell = matrixCells[s][p];
+          if (cell) cell.disabled = !stripEnabled[s];
+        }
+      }
+    }
+
+    function renderPixelMatrix() {
+      const grid = $("pixelMatrix");
+      grid.innerHTML = "";
+      for (let s = 0; s < NUM_STRIPS; s++) matrixCells[s] = [];
+
+      const corner = document.createElement("div");
+      corner.className = "matrix-hdr";
+      grid.appendChild(corner);
+
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        const hdr = document.createElement("div");
+        hdr.className = "matrix-hdr";
+        const lbl = document.createElement("label");
+        lbl.className = "matrix-hdr-label";
+        const title = document.createElement("span");
+        title.textContent = "เส้น " + (s + 1);
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.dataset.strip = String(s);
+        chk.checked = stripEnabled[s];
+        chk.onchange = (e) => {
+          stripEnabled[s] = e.target.checked;
+          updateMatrixCellStates();
+          savePatternSession();
+        };
+        lbl.appendChild(title);
+        lbl.appendChild(chk);
+        hdr.appendChild(lbl);
+        grid.appendChild(hdr);
+      }
+
+      for (let p = 0; p < NUM_LEDS; p++) {
+        const rowLbl = document.createElement("div");
+        rowLbl.className = "matrix-row-lbl";
+        rowLbl.textContent = p;
+        grid.appendChild(rowLbl);
+
+        for (let s = 0; s < NUM_STRIPS; s++) {
+          const hex = stripColors[s][p];
+          const cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = "matrix-cell";
+          cell.textContent = p;
+          cell.style.background = hex;
+          cell.disabled = !stripEnabled[s];
+          const lum = parseInt(hex.slice(1, 3), 16) * 0.299
+            + parseInt(hex.slice(3, 5), 16) * 0.587
+            + parseInt(hex.slice(5, 7), 16) * 0.114;
+          cell.style.color = lum > 120 ? "#111" : "#eee";
+          cell.onclick = () => {
+            if (!stripEnabled[s]) return;
+            paintPixel(s, p, $("pickColor").value, cell);
+          };
+          grid.appendChild(cell);
+          matrixCells[s][p] = cell;
+        }
+      }
+    }
+
+    const effectBox = $("effectBtns");
+    for (let n = 1; n <= EFFECT_MAX; n++) {
+      const b = document.createElement("button");
+      b.dataset.n = n;
+      b.textContent = n;
+      b.title = effectNames[n];
+      b.onclick = async () => {
+        $("power").checked = true;
+        try { showResult(true, await apiCall(() => postEffect(n))); }
+        catch (e) { showResult(false, e.message); }
+      };
+      effectBox.appendChild(b);
+    }
+
+    $("btnSave").onclick = async () => {
+      try {
+        const data = await apiCall(async () => {
+          savePatternPersistent();
+          const runPattern = $("saveWithPatternRun").checked;
+          const fx = runPattern ? EFFECT_PATTERN_SCROLL : (Number($("effect").value) || currentEffect);
+          const px = await postAllPixels(true, fx);
+          await postSettings({
+            power: true,
+            effectMode: fx,
+            brightness: Number($("brightness").value),
+            speed: Number($("speed").value),
+            strips: Object.fromEntries([...Array(NUM_STRIPS)].map((_, i) => [String(i + 1), stripEnabled[i]]))
+          });
+          $("power").checked = true;
+          $("effect").value = fx;
+          currentEffect = fx;
+          updateEffectButtons();
+          if (!px.saved || px.hasPattern === false) {
+            throw new Error("บอร์ดไม่ได้บันทึกภาพ — ลอง POST Settings แล้ว Save อีกครั้ง");
+          }
+          return {
+            ok: true,
+            saved: true,
+            effectMode: fx,
+            patternRun: runPattern,
+            board: px.saved,
+            hasPattern: px.hasPattern
+          };
+        });
+        if (data) {
+          showResult(true, data);
+          showSaveDialog(data);
+        }
+      } catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnSendHold").onclick = async () => {
+      try {
+        showResult(true, await apiCall(async () => {
+          await postAllPixels();
+          return { ok: true, effectMode: 0, hold: true };
+        }));
+      } catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnRunPattern").onclick = async () => {
+      $("power").checked = true;
+      $("saveWithPatternRun").checked = true;
+      try {
+        showResult(true, await apiCall(async () => {
+          await postAllPixels();
+          await postSettings({
+            power: true,
+            effectMode: EFFECT_PATTERN_SCROLL,
+            speed: Number($("speed").value),
+            strips: Object.fromEntries([...Array(NUM_STRIPS)].map((_, i) => [String(i + 1), stripEnabled[i]]))
+          });
+          $("effect").value = EFFECT_PATTERN_SCROLL;
+          return await postEffect(EFFECT_PATTERN_SCROLL);
+        }));
+      } catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnStopPattern").onclick = async () => {
+      try {
+        showResult(true, await apiCall(async () => {
+          await postAllPixels();
+          return { ok: true, effectMode: 0 };
+        }));
+      } catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnFillAll").onclick = async () => {
+      const hex = $("pickColor").value;
+      for (let s = 0; s < NUM_STRIPS; s++) stripColors[s].fill(hex);
+      savePatternSession();
+      renderPixelMatrix();
+      try { showResult(true, await apiCall(() => postAllPixels())); }
+      catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnClearAll").onclick = async () => {
+      for (let s = 0; s < NUM_STRIPS; s++) stripColors[s].fill("#000000");
+      savePatternSession();
+      renderPixelMatrix();
+      try { showResult(true, await apiCall(() => postStripClear("all"))); }
+      catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnEffect").onclick = async () => {
+      try { showResult(true, await postEffect($("effect").value)); }
+      catch (e) { showResult(false, e.message); }
+    };
+
+    $("btnConfig").onclick = async () => {
+      try {
+        showResult(true, await postSettings({
+          power: $("power").checked,
+          brightness: Number($("brightness").value),
+          speed: Number($("speed").value),
+          effectMode: Number($("effect").value),
+          trailLength: Number($("trail").value),
+          useRainbow: $("rainbow").checked,
+          baseColor: $("baseHex").value,
+          background: backgroundPayload(),
+          strips: Object.fromEntries([...Array(NUM_STRIPS)].map((_, i) => [String(i + 1), stripEnabled[i]]))
+        }));
+      } catch (e) { showResult(false, e.message); }
+    };
+
+    function applyDeviceStatus(data) {
+      if (data.effectMode !== undefined) {
+        if (data.effectMode >= 1) currentEffect = data.effectMode;
+        $("effect").value = data.effectMode;
+        $("saveWithPatternRun").checked = data.effectMode === EFFECT_PATTERN_SCROLL;
+      }
+      $("brightness").value = data.brightness ?? 80;
+      $("speed").value = data.speed ?? 60;
+      $("trail").value = data.trailLength ?? 4;
+      $("rainbow").checked = !!data.useRainbow;
+      $("power").checked = data.power !== false;
+      applyStatusColors(data);
+      if (data.strips) {
+        for (let i = 0; i < NUM_STRIPS; i++) {
+          const key = String(i + 1);
+          if (data.strips[key] !== undefined) stripEnabled[i] = !!data.strips[key];
+        }
+      }
+      updateEffectButtons();
+      renderPixelMatrix();
+    }
+
+    async function fetchDeviceStatus() {
+      const res = await fetch(baseUrl() + "/api/status");
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      return JSON.parse(text);
+    }
+
+    async function loadStatusOnStart(patternSource) {
+      try {
+        const data = await fetchDeviceStatus();
+        applyDeviceStatus(data);
+        if (patternSource === "flash") {
+          $("msg").textContent = "โหลดภาพจาก Flash บอร์ด + Settings";
+        } else if (patternSource === "session") {
+          $("msg").textContent = "โหลดภาพจาก sessionStorage + Settings บอร์ด";
+        } else {
+          $("msg").textContent = "โหลด Settings จากบอร์ด (ไม่มีภาพที่ Save)";
+        }
+        $("msg").className = "ok";
+        $("out").textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        if (patternSource === "session") {
+          $("msg").textContent = "เชื่อมบอร์ดไม่ได้ — ใช้ภาพจาก sessionStorage";
+          $("msg").className = "err";
+        } else if (patternSource === "flash") {
+          $("msg").textContent = "โหลดภาพจาก Flash แล้ว — Settings ไม่ได้เชื่อมบอร์ด";
+          $("msg").className = "err";
+        } else {
+          $("msg").textContent = "เชื่อมบอร์ดไม่ได้";
+          $("msg").className = "err";
+        }
+      }
+      renderPixelMatrix();
+    }
+
+    $("btnStatus").onclick = async () => {
+      try {
+        const data = await fetchDeviceStatus();
+        applyDeviceStatus(data);
+        showResult(true, data);
+      } catch (e) { showResult(false, e.message); }
+    };
+
+    renderColorPalette();
+    updateEffectButtons();
+    (async () => {
+      const patternSource = await loadPatternOnStart();
+      renderPixelMatrix();
+      await loadStatusOnStart(patternSource);
+    })();
+  </script>
+</body>
+</html>
