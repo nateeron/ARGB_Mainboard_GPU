@@ -155,6 +155,25 @@
       text-align: center;
     }
     .matrix-cell:disabled { opacity: 0.35; cursor: not-allowed; }
+    .matrix-strip-fill {
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 3px;
+      border: 2px solid var(--border);
+      cursor: pointer;
+      padding: 0;
+      background: #000;
+    }
+    .matrix-strip-fill:hover:not(:disabled) { border-color: var(--accent); }
+    .matrix-strip-fill:disabled { opacity: 0.35; cursor: not-allowed; }
+    .matrix-footer-lbl {
+      font-size: 0.5rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+    }
     .tool-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
     .tool-row button { flex: 1; min-width: 100px; }
     details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
@@ -182,13 +201,53 @@
     .dialog-box h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--accent2); }
     .dialog-box p { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text); line-height: 1.45; white-space: pre-line; }
     .dialog-box button { min-width: 6rem; }
+    .rgb-setting {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .rgb-setting .b1,
+    .rgb-setting .b2 {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+    }
+    .rgb-setting .b1 { flex: 1; min-width: 0; }
+    .rgb-setting .b2 { flex: 0 0 auto; min-width: 10rem; }
+    .used-colors { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.25rem; }
+    .used-color-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .used-color-swatch {
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 3px;
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+    }
+    .used-color-arrow { font-size: 0.75rem; color: var(--muted); }
+    .used-color-row input[type="color"] {
+      width: 2rem;
+      height: 2rem;
+      border: none;
+      padding: 0;
+      background: none;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .used-color-count { font-size: 0.7rem; color: var(--muted); min-width: 1.75rem; text-align: right; }
+    .used-colors-empty { font-size: 0.8rem; color: var(--muted); margin: 0.25rem 0 0; }
   </style>
 </head>
 <body>
   <h1>ESP32 RGB LED Control</h1>
 
   <section>
-    <label>Board IP <input id="host" type="text" value="192.168.55.61"></label>
+    <label>Board IP <input id="host" type="text" value="192.168.55.60"></label>
   </section>
 
   <section id="stripEditor">
@@ -200,9 +259,15 @@
     </div>
     <p class="palette-label">แม่แบบสี (36 สี)</p>
     <div class="palette" id="colorPalette" role="listbox" aria-label="แม่แบบสี"></div>
-    <div class="matrix-wrap">
+    <div class="rgb-setting">
+    <div class="matrix-wrap b1">
       <div class="matrix-grid" id="pixelMatrix"></div>
     </div>
+    <div class="b2">
+      <p class="palette-label" style="margin-top:0">สีที่ใช้ในภาพ</p>
+      <div class="used-colors" id="usedColors"></div>
+    </div>
+  </div>
     <label class="check-label"><input type="checkbox" id="liveSync"> ส่งอัตโนมัติ (400ms)</label>
     <label class="check-label"><input type="checkbox" id="saveWithPatternRun" checked> Save แบบวิ่งรูปทรง (6 เส้น)</label>
     <div class="tool-row">
@@ -274,6 +339,7 @@
     let apiBusy = false;
     let syncTimer = null;
     const matrixCells = Array.from({ length: NUM_STRIPS }, () => []);
+    const stripFillBtns = [];
     const stripColors = Array.from({ length: NUM_STRIPS }, () => Array(NUM_LEDS).fill("#000000"));
     const stripEnabled = Array(NUM_STRIPS).fill(true);
     const SESSION_KEY = "rgb_custom_pattern_session";
@@ -303,6 +369,7 @@
       document.querySelectorAll(".palette-swatch").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.color === h);
       });
+      updateStripFillIcons();
     }
 
     function renderColorPalette() {
@@ -556,17 +623,147 @@
       try { await apiCall(() => postAllPixels()); } catch (e) {}
     }, 400);
 
-    function paintPixel(s, p, hex, cell) {
-      stripColors[s][p] = hex;
-      if (cell) {
-        cell.style.background = hex;
-        const lum = parseInt(hex.slice(1, 3), 16) * 0.299
-          + parseInt(hex.slice(3, 5), 16) * 0.587
-          + parseInt(hex.slice(5, 7), 16) * 0.114;
-        cell.style.color = lum > 120 ? "#111" : "#eee";
+    function cellLumTextColor(hex) {
+      const lum = parseInt(hex.slice(1, 3), 16) * 0.299
+        + parseInt(hex.slice(3, 5), 16) * 0.587
+        + parseInt(hex.slice(5, 7), 16) * 0.114;
+      return lum > 120 ? "#111" : "#eee";
+    }
+
+    function applyCellColor(cell, hex) {
+      cell.style.background = hex;
+      cell.style.color = cellLumTextColor(hex);
+    }
+
+    function getUniqueColors() {
+      const set = new Set();
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        for (let p = 0; p < NUM_LEDS; p++) {
+          set.add(normHex(stripColors[s][p]));
+        }
+      }
+      return Array.from(set).sort();
+    }
+
+    function countColor(hex) {
+      const target = normHex(hex);
+      let n = 0;
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        for (let p = 0; p < NUM_LEDS; p++) {
+          if (normHex(stripColors[s][p]) === target) n++;
+        }
+      }
+      return n;
+    }
+
+    function replaceColorEverywhere(fromHex, toHex) {
+      const from = normHex(fromHex);
+      const to = normHex(toHex);
+      if (from === to) return;
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        for (let p = 0; p < NUM_LEDS; p++) {
+          if (normHex(stripColors[s][p]) !== from) continue;
+          stripColors[s][p] = to;
+          const cell = matrixCells[s][p];
+          if (cell) applyCellColor(cell, to);
+        }
       }
       savePatternSession();
       scheduleMatrixSync();
+      renderUsedColors();
+      updateStripFillIcons();
+    }
+
+    function renderUsedColors() {
+      const box = $("usedColors");
+      box.innerHTML = "";
+      const colors = getUniqueColors();
+      if (!colors.length) {
+        const empty = document.createElement("p");
+        empty.className = "used-colors-empty";
+        empty.textContent = "ยังไม่มีสี";
+        box.appendChild(empty);
+        return;
+      }
+      colors.forEach((hex) => {
+        const row = document.createElement("div");
+        row.className = "used-color-row";
+
+        const swatch = document.createElement("div");
+        swatch.className = "used-color-swatch";
+        swatch.style.background = hex;
+        swatch.title = hex;
+
+        const arrow = document.createElement("span");
+        arrow.className = "used-color-arrow";
+        arrow.textContent = "→";
+        arrow.setAttribute("aria-hidden", "true");
+
+        const picker = document.createElement("input");
+        picker.type = "color";
+        picker.value = hex;
+        picker.title = "เปลี่ยนสี " + hex + " ทั้งหมด";
+        picker.onchange = () => replaceColorEverywhere(hex, picker.value);
+
+        const count = document.createElement("span");
+        count.className = "used-color-count";
+        count.textContent = countColor(hex);
+        count.title = "จำนวนดวง";
+
+        row.appendChild(swatch);
+        row.appendChild(arrow);
+        row.appendChild(picker);
+        row.appendChild(count);
+        box.appendChild(row);
+      });
+    }
+
+    function isStripUniform(s, hex) {
+      const target = normHex(hex);
+      return stripColors[s].every((c) => normHex(c) === target);
+    }
+
+    function updateStripFillIcons() {
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        const btn = stripFillBtns[s];
+        if (!btn) continue;
+        const colors = [...new Set(stripColors[s].map(normHex))];
+        if (colors.length === 1) {
+          btn.style.background = colors[0];
+          btn.style.backgroundImage = "none";
+        } else {
+          const step = 100 / colors.length;
+          const stops = colors.map((c, i) => c + " " + (i * step) + "% " + ((i + 1) * step) + "%").join(", ");
+          btn.style.background = "none";
+          btn.style.backgroundImage = "linear-gradient(180deg, " + stops + ")";
+        }
+        btn.disabled = !stripEnabled[s];
+        const pick = normHex($("pickColor").value);
+        btn.title = "เส้น " + (s + 1) + ": คลิกเติม " + pick + " ทั้งเส้น";
+      }
+    }
+
+    function fillStripLine(s, hex) {
+      if (!stripEnabled[s]) return;
+      hex = normHex(hex);
+      for (let p = 0; p < NUM_LEDS; p++) {
+        stripColors[s][p] = hex;
+        const cell = matrixCells[s][p];
+        if (cell) applyCellColor(cell, hex);
+      }
+      savePatternSession();
+      scheduleMatrixSync();
+      renderUsedColors();
+      updateStripFillIcons();
+    }
+
+    function paintPixel(s, p, hex, cell) {
+      stripColors[s][p] = hex;
+      if (cell) applyCellColor(cell, hex);
+      savePatternSession();
+      scheduleMatrixSync();
+      renderUsedColors();
+      updateStripFillIcons();
     }
 
     function updateMatrixCellStates() {
@@ -576,12 +773,16 @@
           if (cell) cell.disabled = !stripEnabled[s];
         }
       }
+      updateStripFillIcons();
     }
 
     function renderPixelMatrix() {
       const grid = $("pixelMatrix");
       grid.innerHTML = "";
-      for (let s = 0; s < NUM_STRIPS; s++) matrixCells[s] = [];
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        matrixCells[s] = [];
+        stripFillBtns[s] = null;
+      }
 
       const corner = document.createElement("div");
       corner.className = "matrix-hdr";
@@ -621,20 +822,42 @@
           cell.type = "button";
           cell.className = "matrix-cell";
           cell.textContent = p;
-          cell.style.background = hex;
+          applyCellColor(cell, hex);
           cell.disabled = !stripEnabled[s];
-          const lum = parseInt(hex.slice(1, 3), 16) * 0.299
-            + parseInt(hex.slice(3, 5), 16) * 0.587
-            + parseInt(hex.slice(5, 7), 16) * 0.114;
-          cell.style.color = lum > 120 ? "#111" : "#eee";
           cell.onclick = () => {
             if (!stripEnabled[s]) return;
-            paintPixel(s, p, $("pickColor").value, cell);
+            const current = normHex(stripColors[s][p]);
+            const pick = normHex($("pickColor").value);
+            const next = (current !== "#000000" && current === pick) ? "#000000" : pick;
+            paintPixel(s, p, next, cell);
           };
           grid.appendChild(cell);
           matrixCells[s][p] = cell;
         }
       }
+
+      const footerLbl = document.createElement("div");
+      footerLbl.className = "matrix-footer-lbl";
+      footerLbl.textContent = "เส้น";
+      grid.appendChild(footerLbl);
+
+      for (let s = 0; s < NUM_STRIPS; s++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "matrix-strip-fill";
+        btn.setAttribute("aria-label", "เติมสีทั้งเส้น " + (s + 1));
+        btn.onclick = () => {
+          if (!stripEnabled[s]) return;
+          const pick = normHex($("pickColor").value);
+          const next = (isStripUniform(s, pick) && pick !== "#000000") ? "#000000" : pick;
+          fillStripLine(s, next);
+        };
+        grid.appendChild(btn);
+        stripFillBtns[s] = btn;
+      }
+
+      renderUsedColors();
+      updateStripFillIcons();
     }
 
     const effectBox = $("effectBtns");
