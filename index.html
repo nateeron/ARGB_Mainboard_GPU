@@ -62,6 +62,7 @@
       border: 1px solid var(--border);
       background: var(--bg);
       color: var(--text);
+      font-size: 16px;
     }
     button {
       cursor: pointer;
@@ -82,8 +83,13 @@
       gap: 0.5rem;
     }
     .host-row label { flex: 1; min-width: 10rem; margin-top: 0; }
-    .host-row #btnBt,
-    .host-row #btnConnect { flex-shrink: 0; }
+    .host-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .host-actions button { min-height: 2.75rem; }
     .host-row #btnBt { min-width: 3rem; }
     .dialog-box.wide { max-width: 380px; text-align: left; }
     .dialog-box .dialog-actions {
@@ -352,6 +358,48 @@
     }
     .used-color-count { font-size: 0.7rem; color: var(--muted); min-width: 1.75rem; text-align: right; }
     .used-colors-empty { font-size: 0.8rem; color: var(--muted); margin: 0.25rem 0 0; }
+    body.dialog-open { overflow: hidden; }
+    @media (max-width: 540px) {
+      body { padding: 0.75rem; padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+      .host-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .host-row label { min-width: 0; }
+      .host-actions {
+        width: 100%;
+      }
+      .host-actions button {
+        flex: 1;
+        min-height: 2.75rem;
+        font-size: 1rem;
+      }
+      .dialog-overlay {
+        align-items: flex-start;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem max(1rem, env(safe-area-inset-bottom));
+      }
+      .dialog-box {
+        margin: 0 auto;
+        max-height: none;
+      }
+      .dialog-box.wide {
+        max-width: 100%;
+      }
+      .dialog-box button {
+        min-height: 2.75rem;
+        min-width: 0;
+        font-size: 0.95rem;
+      }
+      .dialog-box .dialog-actions button {
+        flex: 1 1 calc(50% - 0.25rem);
+      }
+      .dialog-box .dialog-actions-close button {
+        flex: 1 1 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -362,9 +410,11 @@
 
   <section>
     <div class="host-row">
-      <label>Board IP <input id="host" type="text" value="" placeholder="เช่น 192.168.1.50"></label>
-      <button type="button" id="btnBt" title="เปลี่ยน WiFi / IP">WiFi</button>
-      <button type="button" id="btnConnect" class="primary" title="บันทึก IP + เชื่อมบอร์ด">Connect</button>
+      <label>Board IP <input id="host" type="text" value="" placeholder="เช่น 192.168.1.50" inputmode="decimal" autocomplete="off" enterkeyhint="go"></label>
+      <div class="host-actions">
+        <button type="button" id="btnBt" title="เปลี่ยน WiFi / IP">WiFi</button>
+        <button type="button" id="btnConnect" class="primary" title="บันทึก IP + เชื่อมบอร์ด">Connect</button>
+      </div>
     </div>
   </section>
 
@@ -507,7 +557,7 @@ reset</span>
       <p class="dialog-hint">ตั้ง WiFi + Board IP บันทึก localStorage / sessionStorage และบอร์ด (Flash)</p>
       <label>WiFi Name<input id="wifiDialogSsid" type="text" placeholder="Cayoshi2.4g" autocomplete="username"></label>
       <label>Password<input id="wifiDialogPass" type="text" placeholder="password" autocomplete="off"></label>
-      <label>Board IP<input id="wifiDialogIp" type="text" placeholder="เช่น 192.168.1.50"></label>
+      <label>Board IP<input id="wifiDialogIp" type="text" placeholder="เช่น 192.168.1.50" inputmode="decimal" autocomplete="off" enterkeyhint="done"></label>
       <p class="wifi-history-label">History WiFi (sessionStorage, 5 รายการล่าสุด)</p>
       <div class="wifi-history" id="wifiHistoryList"></div>
       <div class="dialog-actions">
@@ -713,14 +763,41 @@ reset</span>
       el.className = "dialog-status" + (className ? " " + className : "");
     }
 
+    function isMobileDevice() {
+      return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    }
+
+    function setDialogOpen(open) {
+      document.body.classList.toggle("dialog-open", open);
+    }
+
+    function updateBleButtonVisibility() {
+      const bleBtn = $("wifiDialogBle");
+      if (!bleBtn) return;
+      bleBtn.hidden = !navigator.bluetooth;
+    }
+
+    function scrollInputIntoView(input) {
+      if (!isMobileDevice() || !input) return;
+      setTimeout(() => {
+        input.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 300);
+    }
+
     async function showWifiDialog() {
       const creds = loadWifiCredentialsFromMemory();
       $("wifiDialogSsid").value = creds.ssid;
       $("wifiDialogPass").value = creds.password;
       $("wifiDialogIp").value = getBoardIp();
-      setWifiDialogStatus("");
+      if (isMobileDevice() && !navigator.bluetooth) {
+        setWifiDialogStatus("มือถือ (iOS/Safari): กรอก IP เอง หรือใช้ Test Connect", "");
+      } else {
+        setWifiDialogStatus("");
+      }
       renderWifiHistory();
+      updateBleButtonVisibility();
       $("wifiDialog").classList.add("show");
+      setDialogOpen(true);
 
       try {
         const res = await fetch(baseUrl() + "/api/wifi");
@@ -736,6 +813,9 @@ reset</span>
 
     function hideWifiDialog() {
       $("wifiDialog").classList.remove("show");
+      if (!$("helpDialog").classList.contains("show") && !$("saveDialog").classList.contains("show")) {
+        setDialogOpen(false);
+      }
     }
 
     async function saveIpAndConnect(ipOverride) {
@@ -852,10 +932,14 @@ reset</span>
       detail += "\nรีบูตบอร์ดแล้วภาพยังอยู่";
       $("saveDialogMsg").textContent = detail;
       $("saveDialog").classList.add("show");
+      setDialogOpen(true);
     }
 
     function hideSaveDialog() {
       $("saveDialog").classList.remove("show");
+      if (!$("wifiDialog").classList.contains("show") && !$("helpDialog").classList.contains("show")) {
+        setDialogOpen(false);
+      }
     }
 
     $("saveDialogOk").onclick = hideSaveDialog;
@@ -1481,16 +1565,35 @@ reset</span>
     };
 
     loadBoardIpFromSession();
+    updateBleButtonVisibility();
 
     $("host").addEventListener("change", () => setBoardIp($("host").value));
     $("host").addEventListener("blur", () => setBoardIp($("host").value));
+    $("host").addEventListener("focus", () => scrollInputIntoView($("host")));
+    $("host").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        $("btnConnect").click();
+      }
+    });
+    $("wifiDialogIp").addEventListener("focus", () => scrollInputIntoView($("wifiDialogIp")));
+    $("wifiDialogIp").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        $("wifiDialogSave").click();
+      }
+    });
 
     function showHelpDialog() {
       $("helpDialog").classList.add("show");
+      setDialogOpen(true);
     }
 
     function hideHelpDialog() {
       $("helpDialog").classList.remove("show");
+      if (!$("wifiDialog").classList.contains("show") && !$("saveDialog").classList.contains("show")) {
+        setDialogOpen(false);
+      }
     }
 
     $("btnHelp").onclick = showHelpDialog;
