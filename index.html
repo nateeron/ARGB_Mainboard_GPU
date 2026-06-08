@@ -82,10 +82,110 @@
       gap: 0.5rem;
     }
     .host-row label { flex: 1; min-width: 10rem; margin-top: 0; }
-    .host-row #btnBtConnect { flex-shrink: 0; }
-    #btStatus { width: 100%; margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--muted); }
-    #btStatus.ok { color: var(--accent2); }
-    #btStatus.err { color: #f87171; }
+    .host-row #btnBt,
+    .host-row #btnConnect { flex-shrink: 0; }
+    .host-row #btnBt { min-width: 3rem; }
+    .dialog-box.wide { max-width: 380px; text-align: left; }
+    .dialog-box .dialog-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+    }
+    .dialog-box .dialog-actions-close {
+      justify-content: stretch;
+      margin-top: 0.5rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .dialog-box .dialog-actions-close button {
+      flex: 1;
+    }
+    .dialog-box .dialog-hint {
+      margin: 0 0 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .dialog-box .dialog-status {
+      margin: 0.75rem 0 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+    }
+    .dialog-box .dialog-status.ok { color: var(--accent2); }
+    .dialog-box .dialog-status.err { color: #f87171; }
+    .wifi-history-label {
+      margin: 0.75rem 0 0.35rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .wifi-history {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-height: 8.5rem;
+      overflow-y: auto;
+    }
+    .wifi-history-item {
+      width: 100%;
+      text-align: left;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.8rem;
+      line-height: 1.35;
+    }
+    .wifi-history-item:hover { border-color: var(--accent); }
+    .wifi-history-empty {
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .page-header h1 { margin: 0; }
+    .dialog-box.manual {
+      max-width: 520px;
+      max-height: 88vh;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+    }
+    .manual-body {
+      overflow-y: auto;
+      text-align: left;
+      font-size: 0.85rem;
+      line-height: 1.55;
+      max-height: 62vh;
+      padding-right: 0.25rem;
+    }
+    .manual-body h4 {
+      margin: 1rem 0 0.4rem;
+      font-size: 0.92rem;
+      color: var(--accent2);
+    }
+    .manual-body h4:first-child { margin-top: 0; }
+    .manual-body ul {
+      margin: 0.25rem 0 0.5rem;
+      padding-left: 1.25rem;
+    }
+    .manual-body li { margin-bottom: 0.25rem; }
+    .manual-pre {
+      display: block;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.65rem;
+      margin: 0.35rem 0 0.5rem;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      font-family: ui-monospace, Consolas, monospace;
+    }
     .effects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
     .effects button { margin: 0; padding: 0.5rem 0; font-size: 0.9rem; }
     .effects button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -255,14 +355,17 @@
   </style>
 </head>
 <body>
-  <h1>ESP32 RGB LED Control</h1>
+  <div class="page-header">
+    <h1>ESP32 RGB LED Control</h1>
+    <button type="button" id="btnHelp" title="คู่มือการใช้งาน">คู่มือ</button>
+  </div>
 
   <section>
     <div class="host-row">
-      <label>Board IP <input id="host" type="text" value="192.168.55.60"></label>
-      <button type="button" id="btnBtConnect">BT Connect</button>
+      <label>Board IP <input id="host" type="text" value="" placeholder="เช่น 192.168.1.50"></label>
+      <button type="button" id="btnBt" title="เปลี่ยน WiFi / IP">WiFi</button>
+      <button type="button" id="btnConnect" class="primary" title="บันทึก IP + เชื่อมบอร์ด">Connect</button>
     </div>
-    <p id="btStatus">Bluetooth: not connected</p>
   </section>
 
   <section id="stripEditor">
@@ -336,6 +439,90 @@
     </div>
   </div>
 
+  <div class="dialog-overlay" id="helpDialog" role="dialog" aria-modal="true" aria-labelledby="helpDialogTitle">
+    <div class="dialog-box manual">
+      <h3 id="helpDialogTitle">คู่มือการใช้งาน</h3>
+      <div class="manual-body">
+        <h4>1) เชื่อมบอร์ด (หน้าเว็บ)</h4>
+        <ul>
+          <li><strong>Board IP</strong> — IP บอร์ด (DHCP จากเราเตอร์ — ดูจาก getip / BLE Get IP)</li>
+          <li><strong>WiFi</strong> — เปิด dialog ตั้ง WiFi Name / Password / IP</li>
+          <li><strong>Connect</strong> — บันทึก IP + เชื่อม HTTP API</li>
+        </ul>
+
+        <h4>2) ปุ่มใน WiFi Dialog</h4>
+        <ul>
+          <li><strong>BLE Get IP</strong> — ดึง IP จาก Bluetooth Cayoshi_RGB (Chrome/Edge)</li>
+          <li><strong>Save</strong> — บันทึก WiFi + IP (เว็บ + บอร์ด Flash + history 5 แถว)</li>
+          <li><strong>Test Connect</strong> — ทดสอบ HTTP /api/status (บันทึก WiFi ด้วย)</li>
+          <li><strong>Connect</strong> — ส่ง WiFi ให้บอร์ดต่อใหม่ + รับ IP กลับ</li>
+          <li><strong>Close</strong> — ปิด dialog (คลิกพื้นหลังไม่ปิด)</li>
+        </ul>
+
+        <h4>3) Serial Monitor (115200 baud)</h4>
+        <span class="manual-pre">setwifi Cayoshi2.4g asd112233
+wifi
+scanwifi
+wifistatus
+getip
+reset</span>
+        <ul>
+          <li><strong>setwifi &lt;ssid&gt; &lt;password&gt;</strong> — ตั้ง WiFi บันทึก Flash</li>
+          <li><strong>wifi</strong> — ใส่ SSID แล้ว password ทีละขั้น</li>
+          <li><strong>scanwifi</strong> — สแกน WiFi รอบๆ</li>
+          <li><strong>wifistatus</strong> — ดู SSID ที่บันทึก</li>
+          <li><strong>getip</strong> — แสดง IP ปัจจุบัน</li>
+        </ul>
+
+        <h4>4) Bluetooth (BLE)</h4>
+        <ul>
+          <li>ชื่ออุปกรณ์: <strong>Cayoshi_RGB</strong></li>
+          <li>ใช้แอป nRF Connect / LightBlue สแกนหา</li>
+          <li>อ่าน characteristic เพื่อดู IP WiFi</li>
+          <li>Arduino IDE: Tools → Bluetooth → <strong>Enabled</strong> หรือ <strong>NimBLE</strong></li>
+        </ul>
+
+        <h4>5) บอร์ด (app_config.h)</h4>
+        <ul>
+          <li>WiFi: DHCP (IP อัตโนมัติจากเราเตอร์)</li>
+          <li>HTTP API: port 80 — /api/status, /api/wifi, /api/settings</li>
+        </ul>
+
+        <h4>6) แก้ปัญหาเบื้องต้น</h4>
+        <ul>
+          <li>เชื่อมไม่ได้ → ตรวจ IP, WiFi บอร์ด, เปิด Live Server / HTTPS</li>
+          <li>หา BLE ไม่เจอ → อัปโหลดสเก็ตช์ใหม่, เปิด Bluetooth ใน Arduino IDE</li>
+          <li>เปลี่ยน WiFi แล้ว IP เปลี่ยน → กด BLE Get IP หรือ getip ใน Serial</li>
+        </ul>
+      </div>
+      <div class="dialog-actions dialog-actions-close">
+        <button type="button" id="helpDialogClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" id="wifiDialog" role="dialog" aria-modal="true" aria-labelledby="wifiDialogTitle">
+    <div class="dialog-box wide">
+      <h3 id="wifiDialogTitle">Change WiFi Connect</h3>
+      <p class="dialog-hint">ตั้ง WiFi + Board IP บันทึก localStorage / sessionStorage และบอร์ด (Flash)</p>
+      <label>WiFi Name<input id="wifiDialogSsid" type="text" placeholder="Cayoshi2.4g" autocomplete="username"></label>
+      <label>Password<input id="wifiDialogPass" type="text" placeholder="password" autocomplete="off"></label>
+      <label>Board IP<input id="wifiDialogIp" type="text" placeholder="เช่น 192.168.1.50"></label>
+      <p class="wifi-history-label">History WiFi (sessionStorage, 5 รายการล่าสุด)</p>
+      <div class="wifi-history" id="wifiHistoryList"></div>
+      <div class="dialog-actions">
+        <button type="button" id="wifiDialogBle">BLE Get IP</button>
+        <button type="button" id="wifiDialogSave">Save</button>
+        <button type="button" id="wifiDialogTest">Test Connect</button>
+        <button type="button" id="wifiDialogConnect" class="primary">Connect</button>
+      </div>
+      <div class="dialog-actions dialog-actions-close">
+        <button type="button" id="wifiDialogClose">Close</button>
+      </div>
+      <p class="dialog-status" id="wifiDialogStatus"></p>
+    </div>
+  </div>
+
   <script>
     const NUM_STRIPS = 6;
     const NUM_LEDS = 15;
@@ -360,14 +547,15 @@
     const SESSION_KEY = "rgb_custom_pattern_session";
     const LOCAL_KEY = "rgb_custom_pattern_saved";
     const IP_SESSION_KEY = "rgb_custom_board_ip";
-    const BT_SESSION_KEY = "rgb_custom_bt_device";
-    const DEFAULT_HOST = "192.168.55.60";
+    const WIFI_SSID_KEY = "rgb_custom_wifi_ssid";
+    const WIFI_PASS_KEY = "rgb_custom_wifi_pass";
+    const WIFI_HISTORY_KEY = "rgb_custom_wifi_history";
+    const WIFI_HISTORY_LIMIT = 5;
+    const DEFAULT_HOST = "";
+    const DEFAULT_WIFI_SSID = "Cayoshi2.4g";
     const BLE_DEVICE_NAME = "Cayoshi_RGB";
     const BLE_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
     const BLE_IP_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-
-    let bleDevice = null;
-    let bleIpChar = null;
 
     const PALETTE = [
       "#000000", "#333333", "#666666", "#999999", "#cccccc", "#ffffff",
@@ -406,64 +594,167 @@
       return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
     }
 
-    function decodeBleIp(dataView) {
-      return new TextDecoder().decode(dataView).trim();
+    function loadWifiCredentialsFromMemory() {
+      const ssid = localStorage.getItem(WIFI_SSID_KEY)
+        || sessionStorage.getItem(WIFI_SSID_KEY)
+        || DEFAULT_WIFI_SSID;
+      const password = localStorage.getItem(WIFI_PASS_KEY)
+        || sessionStorage.getItem(WIFI_PASS_KEY)
+        || "";
+      return { ssid, password };
     }
 
-    function applyBleIp(rawIp) {
-      if (isValidIp(rawIp)) {
-        setBoardIp(rawIp);
-        updateBtStatus("Connected — IP " + rawIp + " (saved)", "ok");
-        return true;
+    function loadWifiHistory() {
+      try {
+        const raw = sessionStorage.getItem(WIFI_HISTORY_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list.slice(0, WIFI_HISTORY_LIMIT) : [];
+      } catch (e) {
+        return [];
       }
-      if (rawIp === "WiFi not connected") {
-        updateBtStatus("BLE connected — WiFi not connected on board", "err");
-        return false;
-      }
-      updateBtStatus("BLE connected — invalid IP: " + rawIp, "err");
-      return false;
     }
 
-    function updateBtStatus(text, className) {
-      const el = $("btStatus");
+    function saveWifiToHistory(ssid, password, ip) {
+      if (!ssid) return;
+      let list = loadWifiHistory().filter((item) => item.ssid !== ssid);
+      list.unshift({
+        ssid,
+        password: password || "",
+        ip: ip || ""
+      });
+      if (list.length > WIFI_HISTORY_LIMIT) {
+        list = list.slice(0, WIFI_HISTORY_LIMIT);
+      }
+      sessionStorage.setItem(WIFI_HISTORY_KEY, JSON.stringify(list));
+      renderWifiHistory();
+    }
+
+    function applyWifiHistoryItem(item) {
+      $("wifiDialogSsid").value = item.ssid || "";
+      $("wifiDialogPass").value = item.password || "";
+      if (item.ip && isValidIp(item.ip)) {
+        $("wifiDialogIp").value = item.ip;
+      }
+    }
+
+    function renderWifiHistory() {
+      const box = $("wifiHistoryList");
+      if (!box) return;
+      const list = loadWifiHistory();
+      box.innerHTML = "";
+      if (list.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "wifi-history-empty";
+        empty.textContent = "ยังไม่มี history";
+        box.appendChild(empty);
+        return;
+      }
+      list.forEach((item) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "wifi-history-item";
+        const passText = item.password ? item.password : "(open)";
+        const ipPart = item.ip ? " @ " + item.ip : "";
+        btn.textContent = item.ssid + " / " + passText + ipPart;
+        btn.title = "เลือก " + item.ssid;
+        btn.onclick = () => {
+          applyWifiHistoryItem(item);
+          setWifiDialogStatus("เลือก history: " + item.ssid, "ok");
+        };
+        box.appendChild(btn);
+      });
+    }
+
+    function saveWifiCredentialsToMemory(ssid, password, ip) {
+      sessionStorage.setItem(WIFI_SSID_KEY, ssid);
+      sessionStorage.setItem(WIFI_PASS_KEY, password);
+      localStorage.setItem(WIFI_SSID_KEY, ssid);
+      localStorage.setItem(WIFI_PASS_KEY, password);
+      saveWifiToHistory(ssid, password, ip);
+    }
+
+    function readWifiDialogFields() {
+      return {
+        ssid: $("wifiDialogSsid").value.trim(),
+        password: $("wifiDialogPass").value,
+        ip: $("wifiDialogIp").value.trim()
+      };
+    }
+
+    async function postWifiToBoard(ssid, password, connect) {
+      const res = await fetch(baseUrl() + "/api/wifi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ssid, password, save: true, connect })
+      });
+      const text = await res.text();
+      let data = {};
+      try { data = JSON.parse(text); } catch (e) { data = { raw: text }; }
+      if (!res.ok) {
+        throw new Error(data.error || text || ("HTTP " + res.status));
+      }
+      return data;
+    }
+
+    async function connectBoardWifiAndGetIp(ssid, password) {
+      setWifiDialogStatus("บอร์ดกำลังต่อ WiFi…");
+      const data = await postWifiToBoard(ssid, password, true);
+      if (!data.connected || !data.ip || !isValidIp(data.ip)) {
+        throw new Error(data.error || "บอร์ดต่อ WiFi ไม่ได้ — ไม่มี IP");
+      }
+      $("wifiDialogIp").value = data.ip;
+      setBoardIp(data.ip);
+      return data;
+    }
+
+    function setWifiDialogStatus(text, className) {
+      const el = $("wifiDialogStatus");
       el.textContent = text;
-      el.className = className || "";
+      el.className = "dialog-status" + (className ? " " + className : "");
     }
 
-    function onBtDisconnected() {
-      bleDevice = null;
-      bleIpChar = null;
-      $("btnBtConnect").textContent = "BT Connect";
-      updateBtStatus("Bluetooth: disconnected");
+    async function showWifiDialog() {
+      const creds = loadWifiCredentialsFromMemory();
+      $("wifiDialogSsid").value = creds.ssid;
+      $("wifiDialogPass").value = creds.password;
+      $("wifiDialogIp").value = getBoardIp();
+      setWifiDialogStatus("");
+      renderWifiHistory();
+      $("wifiDialog").classList.add("show");
+
+      try {
+        const res = await fetch(baseUrl() + "/api/wifi");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ssid) $("wifiDialogSsid").value = data.ssid;
+        if (data.ip && isValidIp(data.ip)) {
+          $("wifiDialogIp").value = data.ip;
+          setBoardIp(data.ip);
+        }
+      } catch (e) {}
     }
 
-    function onBleIpNotify(event) {
-      const ip = decodeBleIp(event.target.value);
-      if (applyBleIp(ip)) {
-        loadStatusOnStart(null).catch(() => {});
+    function hideWifiDialog() {
+      $("wifiDialog").classList.remove("show");
+    }
+
+    async function saveIpAndConnect(ipOverride) {
+      const ip = (ipOverride != null ? String(ipOverride) : $("host").value).trim();
+      if (!isValidIp(ip)) {
+        throw new Error("IP ไม่ถูกต้อง (เช่น 192.168.1.50)");
       }
+      setBoardIp(ip);
+      const data = await fetchDeviceStatus();
+      applyDeviceStatus(data);
+      return { ip, saved: true, ...data };
     }
 
-    async function btDisconnect() {
-      if (bleIpChar) {
-        try {
-          bleIpChar.removeEventListener("characteristicvaluechanged", onBleIpNotify);
-          await bleIpChar.stopNotifications();
-        } catch (e) {}
-        bleIpChar = null;
-      }
-      if (bleDevice?.gatt?.connected) {
-        bleDevice.gatt.disconnect();
-      }
-      onBtDisconnected();
-    }
-
-    async function btConnect() {
+    async function bleGetIp() {
       if (!navigator.bluetooth) {
-        throw new Error("Web Bluetooth not supported — use Chrome/Edge on HTTPS or localhost");
+        throw new Error("Web Bluetooth ไม่รองรับ — ใช้ Chrome/Edge บน HTTPS หรือ localhost");
       }
 
-      updateBtStatus("Scanning for " + BLE_DEVICE_NAME + "…");
+      setWifiDialogStatus("กำลังสแกน " + BLE_DEVICE_NAME + "…");
 
       const device = await navigator.bluetooth.requestDevice({
         filters: [
@@ -473,30 +764,26 @@
         optionalServices: [BLE_SERVICE_UUID]
       });
 
-      device.addEventListener("gattserverdisconnected", onBtDisconnected);
-
-      updateBtStatus("Connecting…");
+      setWifiDialogStatus("กำลังเชื่อมต่อ BLE…");
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(BLE_SERVICE_UUID);
       const characteristic = await service.getCharacteristic(BLE_IP_CHAR_UUID);
+      const ip = new TextDecoder().decode(await characteristic.readValue()).trim();
 
-      bleDevice = device;
-      bleIpChar = characteristic;
-
-      const ip = decodeBleIp(await characteristic.readValue());
-      sessionStorage.setItem(BT_SESSION_KEY, device.name || BLE_DEVICE_NAME);
-
-      await characteristic.startNotifications();
-      characteristic.addEventListener("characteristicvaluechanged", onBleIpNotify);
-
-      $("btnBtConnect").textContent = "BT Disconnect";
-      applyBleIp(ip);
-
-      if (isValidIp(ip)) {
-        await loadStatusOnStart(null);
+      if (device.gatt.connected) {
+        device.gatt.disconnect();
       }
 
-      return { device: device.name, ip };
+      if (!isValidIp(ip)) {
+        throw new Error(ip === "WiFi not connected"
+          ? "บอร์ดยังไม่ต่อ WiFi — ต่อ WiFi ก่อนแล้วลองใหม่"
+          : "ได้ IP ไม่ถูกต้อง: " + ip);
+      }
+
+      $("wifiDialogIp").value = ip;
+      setBoardIp(ip);
+      setWifiDialogStatus("ได้ IP จาก BLE: " + ip + " (บันทึกแล้ว)", "ok");
+      return ip;
     }
 
     function normHex(hex) {
@@ -1194,26 +1481,142 @@
     };
 
     loadBoardIpFromSession();
-    const savedBtName = sessionStorage.getItem(BT_SESSION_KEY);
-    if (savedBtName) {
-      updateBtStatus("Last BT device: " + savedBtName + " — tap BT Connect");
-    }
 
     $("host").addEventListener("change", () => setBoardIp($("host").value));
     $("host").addEventListener("blur", () => setBoardIp($("host").value));
 
-    $("btnBtConnect").onclick = async () => {
+    function showHelpDialog() {
+      $("helpDialog").classList.add("show");
+    }
+
+    function hideHelpDialog() {
+      $("helpDialog").classList.remove("show");
+    }
+
+    $("btnHelp").onclick = showHelpDialog;
+    $("helpDialogClose").onclick = hideHelpDialog;
+
+    $("btnBt").onclick = showWifiDialog;
+
+    $("wifiDialogClose").onclick = hideWifiDialog;
+
+    $("wifiDialogTest").onclick = async () => {
+      const { ssid, password, ip } = readWifiDialogFields();
+      if (!ssid) {
+        setWifiDialogStatus("กรอก WiFi Name", "err");
+        return;
+      }
+      if (!isValidIp(ip)) {
+        setWifiDialogStatus("IP ไม่ถูกต้อง", "err");
+        return;
+      }
+      saveWifiCredentialsToMemory(ssid, password, ip);
       try {
-        if (bleDevice?.gatt?.connected) {
-          await btDisconnect();
-          showResult(true, { bt: "disconnected" });
-          return;
+        setWifiDialogStatus("ทดสอบเชื่อม " + ip + "…");
+        const res = await fetch("http://" + ip + "/api/status");
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || ("HTTP " + res.status));
+        const data = JSON.parse(text);
+        setWifiDialogStatus(
+          "Test Connect OK — " + ip + " (effect " + (data.effectMode ?? "?") + ")",
+          "ok"
+        );
+        showResult(true, { test: true, ip, ...data });
+      } catch (e) {
+        setWifiDialogStatus("Test Connect ล้มเหลว: " + e.message, "err");
+        showResult(false, e.message);
+      }
+    };
+
+    $("wifiDialogSave").onclick = async () => {
+      const { ssid, password, ip } = readWifiDialogFields();
+      if (!ssid) {
+        setWifiDialogStatus("กรอก WiFi Name", "err");
+        return;
+      }
+      if (!isValidIp(ip)) {
+        setWifiDialogStatus("IP ไม่ถูกต้อง", "err");
+        return;
+      }
+      saveWifiCredentialsToMemory(ssid, password, ip);
+      setBoardIp(ip);
+      try {
+        await postWifiToBoard(ssid, password, false);
+        setWifiDialogStatus("บันทึก WiFi + IP (เว็บ + บอร์ด Flash + history) แล้ว", "ok");
+      } catch (e) {
+        setWifiDialogStatus("บันทึกเว็บแล้ว — บอร์ด: " + e.message, "err");
+      }
+      $("msg").textContent = "บันทึก WiFi " + ssid + " + IP " + ip;
+      $("msg").className = "ok";
+    };
+
+    $("wifiDialogBle").onclick = async () => {
+      try {
+        await bleGetIp();
+      } catch (e) {
+        setWifiDialogStatus(e.message, "err");
+      }
+    };
+
+    $("wifiDialogConnect").onclick = async () => {
+      const { ssid, password, ip } = readWifiDialogFields();
+      if (!ssid) {
+        setWifiDialogStatus("กรอก WiFi Name", "err");
+        return;
+      }
+
+      saveWifiCredentialsToMemory(ssid, password, ip);
+
+      try {
+        const wifiData = await connectBoardWifiAndGetIp(ssid, password);
+        saveWifiCredentialsToMemory(ssid, password, wifiData.ip);
+        const status = await fetchDeviceStatus();
+        applyDeviceStatus(status);
+        setWifiDialogStatus("WiFi " + ssid + " OK — IP " + wifiData.ip, "ok");
+        $("msg").textContent = "บอร์ดต่อ WiFi แล้ว — IP " + wifiData.ip;
+        $("msg").className = "ok";
+        showResult(true, { ...wifiData, ...status });
+      } catch (e) {
+        if (e.message.includes("Failed to fetch") || e.message.includes("NetworkError")) {
+          try {
+            setWifiDialogStatus("HTTP ขาด — ลอง BLE Get IP…");
+            const bleIp = await bleGetIp();
+            saveWifiCredentialsToMemory(ssid, password, bleIp);
+            const status = await fetchDeviceStatus();
+            applyDeviceStatus(status);
+            setWifiDialogStatus("WiFi OK — IP จาก BLE: " + bleIp, "ok");
+            $("msg").textContent = "บอร์ดต่อ WiFi แล้ว — IP " + bleIp;
+            $("msg").className = "ok";
+            showResult(true, { ip: bleIp, ssid, ble: true, ...status });
+            return;
+          } catch (bleErr) {
+            setWifiDialogStatus("บันทึก WiFi แล้ว — ใช้ BLE Get IP หรือ Test Connect", "err");
+            showResult(false, bleErr.message);
+            return;
+          }
         }
-        const data = await btConnect();
+        setWifiDialogStatus(e.message, "err");
+        $("msg").textContent = e.message;
+        $("msg").className = "err";
+        showResult(false, e.message);
+      }
+    };
+
+    $("btnConnect").onclick = async () => {
+      try {
+        const data = await saveIpAndConnect();
+        $("msg").textContent = "บันทึก IP " + data.ip + " แล้ว — เชื่อมบอร์ด OK";
+        $("msg").className = "ok";
         showResult(true, data);
       } catch (e) {
-        onBtDisconnected();
-        updateBtStatus("Bluetooth error: " + e.message, "err");
+        const ip = getBoardIp();
+        if (isValidIp($("host").value.trim())) {
+          setBoardIp($("host").value);
+          $("msg").textContent = "บันทึก IP " + ip + " แล้ว — เชื่อมบอร์ดไม่ได้";
+        } else {
+          $("msg").textContent = e.message;
+        }
+        $("msg").className = "err";
         showResult(false, e.message);
       }
     };
