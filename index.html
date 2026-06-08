@@ -75,6 +75,17 @@
     button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
     button.success { background: var(--accent2); border-color: var(--accent2); color: #fff; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .host-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.5rem;
+    }
+    .host-row label { flex: 1; min-width: 10rem; margin-top: 0; }
+    .host-row #btnBtConnect { flex-shrink: 0; }
+    #btStatus { width: 100%; margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--muted); }
+    #btStatus.ok { color: var(--accent2); }
+    #btStatus.err { color: #f87171; }
     .effects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
     .effects button { margin: 0; padding: 0.5rem 0; font-size: 0.9rem; }
     .effects button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -247,7 +258,11 @@
   <h1>ESP32 RGB LED Control</h1>
 
   <section>
-    <label>Board IP <input id="host" type="text" value="192.168.55.60"></label>
+    <div class="host-row">
+      <label>Board IP <input id="host" type="text" value="192.168.55.60"></label>
+      <button type="button" id="btnBtConnect">BT Connect</button>
+    </div>
+    <p id="btStatus">Bluetooth: not connected</p>
   </section>
 
   <section id="stripEditor">
@@ -344,6 +359,15 @@
     const stripEnabled = Array(NUM_STRIPS).fill(true);
     const SESSION_KEY = "rgb_custom_pattern_session";
     const LOCAL_KEY = "rgb_custom_pattern_saved";
+    const IP_SESSION_KEY = "rgb_custom_board_ip";
+    const BT_SESSION_KEY = "rgb_custom_bt_device";
+    const DEFAULT_HOST = "192.168.55.60";
+    const BLE_DEVICE_NAME = "Cayoshi_RGB";
+    const BLE_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const BLE_IP_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+    let bleDevice = null;
+    let bleIpChar = null;
 
     const PALETTE = [
       "#000000", "#333333", "#666666", "#999999", "#cccccc", "#ffffff",
@@ -354,7 +378,126 @@
       "#ff6699", "#ff99cc", "#ffcccc", "#aa5500", "#00aa88", "#aa00aa"
     ];
 
-    function baseUrl() { return "http://" + $("host").value.trim(); }
+    function getBoardIp() {
+      const ip = $("host").value.trim();
+      return ip || DEFAULT_HOST;
+    }
+
+    function setBoardIp(ip) {
+      const v = (ip || "").trim();
+      $("host").value = v || DEFAULT_HOST;
+      sessionStorage.setItem(IP_SESSION_KEY, $("host").value);
+    }
+
+    function loadBoardIpFromSession() {
+      const saved = sessionStorage.getItem(IP_SESSION_KEY);
+      if (saved && saved.trim()) {
+        $("host").value = saved.trim();
+        return saved.trim();
+      }
+      const fallback = $("host").value.trim() || DEFAULT_HOST;
+      $("host").value = fallback;
+      return fallback;
+    }
+
+    function baseUrl() { return "http://" + getBoardIp(); }
+
+    function isValidIp(ip) {
+      return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
+    }
+
+    function decodeBleIp(dataView) {
+      return new TextDecoder().decode(dataView).trim();
+    }
+
+    function applyBleIp(rawIp) {
+      if (isValidIp(rawIp)) {
+        setBoardIp(rawIp);
+        updateBtStatus("Connected — IP " + rawIp + " (saved)", "ok");
+        return true;
+      }
+      if (rawIp === "WiFi not connected") {
+        updateBtStatus("BLE connected — WiFi not connected on board", "err");
+        return false;
+      }
+      updateBtStatus("BLE connected — invalid IP: " + rawIp, "err");
+      return false;
+    }
+
+    function updateBtStatus(text, className) {
+      const el = $("btStatus");
+      el.textContent = text;
+      el.className = className || "";
+    }
+
+    function onBtDisconnected() {
+      bleDevice = null;
+      bleIpChar = null;
+      $("btnBtConnect").textContent = "BT Connect";
+      updateBtStatus("Bluetooth: disconnected");
+    }
+
+    function onBleIpNotify(event) {
+      const ip = decodeBleIp(event.target.value);
+      if (applyBleIp(ip)) {
+        loadStatusOnStart(null).catch(() => {});
+      }
+    }
+
+    async function btDisconnect() {
+      if (bleIpChar) {
+        try {
+          bleIpChar.removeEventListener("characteristicvaluechanged", onBleIpNotify);
+          await bleIpChar.stopNotifications();
+        } catch (e) {}
+        bleIpChar = null;
+      }
+      if (bleDevice?.gatt?.connected) {
+        bleDevice.gatt.disconnect();
+      }
+      onBtDisconnected();
+    }
+
+    async function btConnect() {
+      if (!navigator.bluetooth) {
+        throw new Error("Web Bluetooth not supported — use Chrome/Edge on HTTPS or localhost");
+      }
+
+      updateBtStatus("Scanning for " + BLE_DEVICE_NAME + "…");
+
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { name: BLE_DEVICE_NAME },
+          { namePrefix: "Cayoshi" }
+        ],
+        optionalServices: [BLE_SERVICE_UUID]
+      });
+
+      device.addEventListener("gattserverdisconnected", onBtDisconnected);
+
+      updateBtStatus("Connecting…");
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+      const characteristic = await service.getCharacteristic(BLE_IP_CHAR_UUID);
+
+      bleDevice = device;
+      bleIpChar = characteristic;
+
+      const ip = decodeBleIp(await characteristic.readValue());
+      sessionStorage.setItem(BT_SESSION_KEY, device.name || BLE_DEVICE_NAME);
+
+      await characteristic.startNotifications();
+      characteristic.addEventListener("characteristicvaluechanged", onBleIpNotify);
+
+      $("btnBtConnect").textContent = "BT Disconnect";
+      applyBleIp(ip);
+
+      if (isValidIp(ip)) {
+        await loadStatusOnStart(null);
+      }
+
+      return { device: device.name, ip };
+    }
 
     function normHex(hex) {
       let h = hex.trim();
@@ -1048,6 +1191,31 @@
         applyDeviceStatus(data);
         showResult(true, data);
       } catch (e) { showResult(false, e.message); }
+    };
+
+    loadBoardIpFromSession();
+    const savedBtName = sessionStorage.getItem(BT_SESSION_KEY);
+    if (savedBtName) {
+      updateBtStatus("Last BT device: " + savedBtName + " — tap BT Connect");
+    }
+
+    $("host").addEventListener("change", () => setBoardIp($("host").value));
+    $("host").addEventListener("blur", () => setBoardIp($("host").value));
+
+    $("btnBtConnect").onclick = async () => {
+      try {
+        if (bleDevice?.gatt?.connected) {
+          await btDisconnect();
+          showResult(true, { bt: "disconnected" });
+          return;
+        }
+        const data = await btConnect();
+        showResult(true, data);
+      } catch (e) {
+        onBtDisconnected();
+        updateBtStatus("Bluetooth error: " + e.message, "err");
+        showResult(false, e.message);
+      }
     };
 
     renderColorPalette();
